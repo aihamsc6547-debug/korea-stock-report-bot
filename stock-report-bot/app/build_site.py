@@ -331,7 +331,10 @@ def _render_table(table_lines: list[str]) -> str:
         aligns = [_alignment_class(cell) for cell in body_rows[0]]
         body_rows = body_rows[1:]
 
-    header_html = "".join(f"<th>{_convert_inline(cell)}</th>" for cell in header)
+    header_html = "".join(
+        f'<th{_class_attr(aligns[index] if index < len(aligns) else "")}>{_convert_inline(cell)}</th>'
+        for index, cell in enumerate(header)
+    )
     body_html = "\n".join(
         "<tr>"
         + "".join(
@@ -561,11 +564,13 @@ th {
   font-weight: 800;
 }
 
+th.numeric,
 td.numeric {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
+th.center,
 td.center {
   text-align: center;
 }

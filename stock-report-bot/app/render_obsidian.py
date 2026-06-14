@@ -81,7 +81,7 @@ def _render_group_table(cause: str, items: list[StockReportItem]) -> list[str]:
         f"### {cause} ({len(items)}개)",
         "",
         "| 종목명 | 등락률 | 거래대금 |",
-        "|---|---:|---:|",
+        "|:---:|:---:|---:|",
     ]
 
     for item in items:

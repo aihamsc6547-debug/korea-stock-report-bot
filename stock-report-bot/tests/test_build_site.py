@@ -24,7 +24,7 @@ date: 2026-06-12
 ### 반도체 업황/테마 부각 (1개)
 
 | 종목명 | 등락률 | 거래대금 |
-|---|---:|---:|
+|:---:|:---:|---:|
 | HPSP | +30.00% | 1,122억 원 |
 
 ## 종목별 메모
@@ -41,8 +41,11 @@ class BuildSiteTest(unittest.TestCase):
 
         self.assertIn("<h1", rendered)
         self.assertIn("<table>", rendered)
-        self.assertIn("<th>종목명</th>", rendered)
-        self.assertIn('<td class="numeric">+30.00%</td>', rendered)
+        self.assertIn('<th class="center">종목명</th>', rendered)
+        self.assertIn('<th class="numeric">거래대금</th>', rendered)
+        self.assertIn('<td class="center">HPSP</td>', rendered)
+        self.assertIn('<td class="center">+30.00%</td>', rendered)
+        self.assertIn('<td class="numeric">1,122억 원</td>', rendered)
         self.assertIn('<a href="https://example.com/news"', rendered)
 
     def test_build_site_creates_index_and_report_pages(self) -> None:

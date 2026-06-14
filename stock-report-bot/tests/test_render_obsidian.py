@@ -40,6 +40,7 @@ class RenderObsidianTest(unittest.TestCase):
         self.assertIn("선별 1개 | 상한가 0개 | 12% 이상 1개 | 거래량 1,000만 주 이상 1개 | 거래대금 50억 이상 1개", rendered)
         self.assertIn("### 공급계약/수주 기대감 (1개)", rendered)
         self.assertIn("| 종목명 | 등락률 | 거래대금 |", rendered)
+        self.assertIn("|:---:|:---:|---:|", rendered)
         self.assertIn("| 예시종목 | +18.42% | 1,240억 원 |", rendered)
         self.assertIn("#### 예시종목 (000000) +18.42%", rendered)
         self.assertIn("[예시종목 급등](https://example.com/news)", rendered)
