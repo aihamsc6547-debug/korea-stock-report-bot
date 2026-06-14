@@ -1,0 +1,2 @@
+"""Korea stock report bot."""
+

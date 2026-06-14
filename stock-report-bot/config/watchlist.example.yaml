@@ -1,0 +1,14 @@
+# Optional future config.
+# MVP에서는 아직 사용하지 않습니다.
+
+exclude_names:
+  - 스팩
+
+theme_keywords:
+  - AI
+  - 반도체
+  - 2차전지
+  - 원전
+  - 방산
+  - 로봇
+

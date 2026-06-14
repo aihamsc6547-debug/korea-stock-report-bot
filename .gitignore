@@ -1,0 +1,34 @@
+# Secrets
+.env
+*.env
+!*.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local caches
+.pycache/
+.mplconfig/
+
+# macOS
+.DS_Store
+
+# Generated market reports
+# Keep the folder README, but avoid publishing generated daily reports by default.
+Obsidian-Archive/Market-Reports/**/*.md
+!Obsidian-Archive/Market-Reports/README.md
+
+# Share bundles
+*.zip
+
+# Generated website output
+public/
+
+# Local editor/project files
+.idea/
+.vscode/
