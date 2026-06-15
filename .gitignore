@@ -29,6 +29,10 @@ Obsidian-Archive/Market-Reports/**/*.md
 # Generated website output
 public/
 
+# Local reference source files
+reference/enex/
+reference/**/*.enex
+
 # Local editor/project files
 .idea/
 .vscode/

@@ -1,9 +1,20 @@
 from __future__ import annotations
 
+import csv
 from collections import Counter
+from functools import lru_cache
+from pathlib import Path
 
 from .models import NewsItem, StockMove
 
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+THEME_MEMORY_PATH = PROJECT_ROOT / "config" / "theme_memory.csv"
+HIGH_CONFIDENCE_MEMORY_COUNT = 5
+HIGH_CONFIDENCE_MEMORY_SCORE = 0.80
+FALLBACK_MEMORY_COUNT = 5
+FALLBACK_MEMORY_SCORE = 0.55
+NON_OVERRIDING_MEMORY_THEMES = {"개별주"}
 
 KEYWORD_CAUSES: tuple[tuple[str, str], ...] = (
     ("액면병합", "액면병합/거래재개 이슈"),
@@ -46,16 +57,32 @@ def infer_cause(stock: StockMove, news: list[NewsItem]) -> str:
     if stock_name_cause:
         return stock_name_cause
 
+    news_text = _join_news_text(news)
+    high_confidence_memory = _infer_from_theme_memory(
+        stock.name,
+        min_count=HIGH_CONFIDENCE_MEMORY_COUNT,
+        min_confidence=HIGH_CONFIDENCE_MEMORY_SCORE,
+    )
+    if high_confidence_memory:
+        return high_confidence_memory
+
     if news:
         lead_causes = _extract_causes(news[0].title + " " + news[0].description)
         if lead_causes:
             return Counter(lead_causes).most_common(1)[0][0]
 
-    text = " ".join([item.title + " " + item.description for item in news])
-    causes = _extract_causes(text)
+    causes = _extract_causes(news_text)
 
     if causes:
         return Counter(causes).most_common(1)[0][0]
+
+    fallback_memory = _infer_from_theme_memory(
+        stock.name,
+        min_count=FALLBACK_MEMORY_COUNT,
+        min_confidence=FALLBACK_MEMORY_SCORE,
+    )
+    if fallback_memory:
+        return fallback_memory
 
     if "상한가" in stock.reasons:
         return "상한가 기록, 구체적 재료는 추가 확인 필요"
@@ -83,6 +110,36 @@ def _extract_causes(text: str) -> list[str]:
             causes.append(cause)
 
     return causes
+
+
+def _join_news_text(news: list[NewsItem]) -> str:
+    return " ".join([item.title + " " + item.description for item in news])
+
+
+def _infer_from_theme_memory(name: str, min_count: int, min_confidence: float) -> str:
+    entry = _load_theme_memory().get(name)
+    if not entry:
+        return ""
+
+    theme = entry["preferred_theme"]
+    if theme in NON_OVERRIDING_MEMORY_THEMES:
+        return ""
+
+    if int(entry["preferred_count"]) < min_count:
+        return ""
+    if float(entry["confidence"]) < min_confidence:
+        return ""
+
+    return theme
+
+
+@lru_cache(maxsize=1)
+def _load_theme_memory() -> dict[str, dict[str, str]]:
+    if not THEME_MEMORY_PATH.exists():
+        return {}
+
+    with THEME_MEMORY_PATH.open(encoding="utf-8", newline="") as file:
+        return {row["stock_name"]: row for row in csv.DictReader(file)}
 
 
 def summarize_news(news: list[NewsItem]) -> str:

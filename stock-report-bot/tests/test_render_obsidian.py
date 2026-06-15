@@ -56,6 +56,28 @@ class FilterStocksTest(unittest.TestCase):
 
 
 class SummarizeTest(unittest.TestCase):
+    def test_high_confidence_theme_memory_beats_generic_news_keyword(self) -> None:
+        stock = StockMove(
+            code="005930",
+            name="삼성전자",
+            market="KOSPI",
+            close=0,
+            change_percent=7.86,
+            volume=1,
+            trading_value=10_000_000_000,
+            reasons=("거래대금 50억 이상",),
+        )
+        news = [
+            NewsItem(
+                title="삼성전자, AI 서버 투자 확대 기대",
+                link="https://example.com",
+                originallink="",
+                description="AI 인프라 수요 증가가 반도체 업황 개선으로 이어진다는 분석이다.",
+            )
+        ]
+
+        self.assertEqual(infer_cause(stock, news), "삼성 / 반디플")
+
     def test_robot_stock_name_wins_over_shipyard_context(self) -> None:
         stock = StockMove(
             code="108490",
@@ -77,6 +99,28 @@ class SummarizeTest(unittest.TestCase):
         ]
 
         self.assertEqual(infer_cause(stock, news), "로봇 테마 부각")
+
+    def test_mixed_theme_memory_does_not_override_current_news_keyword(self) -> None:
+        stock = StockMove(
+            code="023160",
+            name="태광",
+            market="KOSDAQ",
+            close=0,
+            change_percent=13.41,
+            volume=1,
+            trading_value=10_000_000_000,
+            reasons=("12% 이상 상승", "거래대금 50억 이상"),
+        )
+        news = [
+            NewsItem(
+                title="태광, 조선 기자재 수주 기대감에 상승",
+                link="https://example.com",
+                originallink="",
+                description="조선 업황 개선과 기자재 수요가 부각됐다.",
+            )
+        ]
+
+        self.assertEqual(infer_cause(stock, news), "조선/기자재 테마")
 
 
 if __name__ == "__main__":
