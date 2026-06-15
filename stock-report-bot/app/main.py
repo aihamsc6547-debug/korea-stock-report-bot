@@ -10,7 +10,7 @@ from .fetch_news import fetch_stock_news
 from .filter_stocks import dedupe_moves
 from .models import DailyReport, StockReportItem
 from .render_obsidian import write_report
-from .summarize import infer_cause, summarize_news
+from .summarize import infer_cause, prioritize_news_for_cause, summarize_news
 
 
 def main() -> None:
@@ -26,11 +26,13 @@ def main() -> None:
 
     for move in moves:
         news = fetch_stock_news(move, settings)
+        cause = infer_cause(move, news)
+        news = prioritize_news_for_cause(news, cause)
         items.append(
             StockReportItem(
                 stock=move,
                 news=news,
-                cause=infer_cause(move, news),
+                cause=cause,
                 summary=summarize_news(news),
             )
         )

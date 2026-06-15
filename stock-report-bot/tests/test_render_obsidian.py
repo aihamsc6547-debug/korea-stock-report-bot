@@ -6,7 +6,7 @@ from datetime import date
 from app.filter_stocks import dedupe_moves
 from app.models import DailyReport, NewsItem, StockMove, StockReportItem
 from app.render_obsidian import render_report
-from app.summarize import infer_cause
+from app.summarize import infer_cause, prioritize_news_for_cause
 
 
 class RenderObsidianTest(unittest.TestCase):
@@ -77,6 +77,60 @@ class SummarizeTest(unittest.TestCase):
         ]
 
         self.assertEqual(infer_cause(stock, news), "삼성 / 반디플")
+
+    def test_theme_memory_groups_north_korea_related_stocks(self) -> None:
+        news = [
+            NewsItem(
+                title="남북 경협주, 트럼프가 올린 김정은 사진에 급등",
+                link="https://example.com",
+                originallink="",
+                description="좋은사람들과 코데즈컴바인 등 남북 경제 협력 관련 종목이 상승했다.",
+            )
+        ]
+        stocks = [
+            StockMove(
+                code="033340",
+                name="좋은사람들",
+                market="KOSDAQ",
+                close=0,
+                change_percent=20.53,
+                volume=1,
+                trading_value=10_000_000_000,
+                reasons=("12% 이상 상승", "거래대금 50억 이상"),
+            ),
+            StockMove(
+                code="047770",
+                name="코데즈컴바인",
+                market="KOSDAQ",
+                close=0,
+                change_percent=29.89,
+                volume=1,
+                trading_value=10_000_000_000,
+                reasons=("상한가", "12% 이상 상승", "거래대금 50억 이상"),
+            ),
+        ]
+
+        self.assertEqual([infer_cause(stock, news) for stock in stocks], ["남북경협/대북 테마", "남북경협/대북 테마"])
+
+    def test_prioritize_news_for_cause_moves_matching_article_first(self) -> None:
+        news = [
+            NewsItem(
+                title="건강보험 적용 기대에 탈모주 무더기 상한가",
+                link="https://example.com/health",
+                originallink="",
+                description="코데즈컴바인 등 상한가 종목이 함께 언급됐다.",
+            ),
+            NewsItem(
+                title="남북 경협주, 김정은 사진에 급등",
+                link="https://example.com/north",
+                originallink="",
+                description="좋은사람들과 코데즈컴바인 등 남북 경제 협력 관련주가 강세다.",
+            ),
+        ]
+
+        ranked = prioritize_news_for_cause(news, "남북경협/대북 테마")
+
+        self.assertEqual(ranked[0].link, "https://example.com/north")
 
     def test_robot_stock_name_wins_over_shipyard_context(self) -> None:
         stock = StockMove(

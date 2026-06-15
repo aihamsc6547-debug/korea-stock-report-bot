@@ -19,6 +19,7 @@ STOCK_LINE_RE = re.compile(r"^●(.+)")
 STOCK_NAME_RE = re.compile(r"([^()/,●]+?)\s*\([+-]?\d+(?:\.\d+)?%\)")
 TITLE_DATE_RE = re.compile(r"(?P<year>20\d{2})[.\-](?P<month>\d{2})[.\-](?P<day>\d{2})")
 THEME_RE = re.compile(r"^<\s*(?P<theme>[^<>]{1,70})\s*>$")
+BROAD_THEMES = {"개별주", "정부 정책", "실적 / 공시"}
 
 
 @dataclass(frozen=True)
@@ -131,18 +132,31 @@ def _extract_examples_from_note(note_title: str, content: str) -> list[ThemeExam
     note_date = _extract_note_date(note_title)
     current_theme = ""
     examples: list[ThemeExample] = []
+    lines = _enml_to_text_lines(content)
+    index = 0
 
-    for line in _enml_to_text_lines(content):
+    while index < len(lines):
+        line = lines[index]
         theme = _extract_theme(line)
         if theme:
             current_theme = theme
+            index += 1
             continue
 
         if not current_theme or not line.startswith("●"):
+            index += 1
             continue
 
+        block_lines = [line]
+        index += 1
+        while index < len(lines) and not lines[index].startswith("●") and not _extract_theme(lines[index]):
+            block_lines.append(lines[index])
+            index += 1
+
+        block_theme = _infer_theme_from_block(" ".join(block_lines))
+        theme_for_block = _choose_theme(current_theme, block_theme)
         for stock_name in _extract_stock_names(line):
-            examples.append(ThemeExample(note_date=note_date, stock_name=stock_name, theme=current_theme))
+            examples.append(ThemeExample(note_date=note_date, stock_name=stock_name, theme=theme_for_block))
 
     return examples
 
@@ -186,6 +200,8 @@ def _extract_theme(line: str) -> str:
 def _normalize_theme(theme: str) -> str:
     compact = re.sub(r"\s+", "", theme)
 
+    if any(keyword in compact for keyword in ("남북", "대북", "북한", "김정은", "경협", "개성공단", "금강산")):
+        return "남북경협/대북 테마"
     if "반디플" in compact or "반/디플" in compact or "반도체" in compact:
         return "삼성 / 반디플"
     if "로봇" in compact:
@@ -212,6 +228,27 @@ def _normalize_theme(theme: str) -> str:
         return "정부 정책"
 
     return theme
+
+
+def _choose_theme(section_theme: str, block_theme: str) -> str:
+    if not block_theme:
+        return section_theme
+    if section_theme in BROAD_THEMES:
+        return block_theme
+    return section_theme
+
+
+def _infer_theme_from_block(text: str) -> str:
+    compact = re.sub(r"\s+", "", text)
+
+    if any(keyword in compact for keyword in ("남북경협", "남북경제협력", "경협주", "대북", "북한", "김정은", "개성공단", "금강산")):
+        return "남북경협/대북 테마"
+    if any(keyword in compact for keyword in ("국제유가", "유가급락", "항공株", "항공주")):
+        return "항공/유가 하락 수혜"
+    if any(keyword in compact for keyword in ("방산", "미사일", "천궁", "중동")):
+        return "방산"
+
+    return ""
 
 
 def _clean_stock_name(value: str) -> str:

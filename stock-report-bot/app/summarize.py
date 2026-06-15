@@ -15,12 +15,24 @@ HIGH_CONFIDENCE_MEMORY_SCORE = 0.80
 FALLBACK_MEMORY_COUNT = 5
 FALLBACK_MEMORY_SCORE = 0.55
 NON_OVERRIDING_MEMORY_THEMES = {"개별주"}
+CAUSE_NEWS_HINTS: dict[str, tuple[str, ...]] = {
+    "남북경협/대북 테마": ("남북", "경협", "대북", "북한", "김정은", "개성공단", "금강산"),
+}
 
 KEYWORD_CAUSES: tuple[tuple[str, str], ...] = (
     ("액면병합", "액면병합/거래재개 이슈"),
     ("주식병합", "액면병합/거래재개 이슈"),
     ("거래재개", "액면병합/거래재개 이슈"),
     ("거래 재개", "액면병합/거래재개 이슈"),
+    ("남북 경협", "남북경협/대북 테마"),
+    ("남북경협", "남북경협/대북 테마"),
+    ("남북 경제 협력", "남북경협/대북 테마"),
+    ("경협주", "남북경협/대북 테마"),
+    ("대북", "남북경협/대북 테마"),
+    ("북한", "남북경협/대북 테마"),
+    ("김정은", "남북경협/대북 테마"),
+    ("개성공단", "남북경협/대북 테마"),
+    ("금강산", "남북경협/대북 테마"),
     ("자율주행", "자율주행/모빌리티 테마"),
     ("전력기기", "전력기기/전력망 테마"),
     ("변압기", "전력기기/전력망 테마"),
@@ -149,3 +161,24 @@ def summarize_news(news: list[NewsItem]) -> str:
     lead = news[0]
     summary = lead.description or lead.title
     return summary.strip() or "기사 요약문이 제공되지 않았습니다."
+
+
+def prioritize_news_for_cause(news: list[NewsItem], cause: str) -> list[NewsItem]:
+    hints = CAUSE_NEWS_HINTS.get(cause)
+    if not hints:
+        return news
+
+    indexed = list(enumerate(news))
+    return [
+        item
+        for _, item in sorted(
+            indexed,
+            key=lambda pair: (_cause_news_score(pair[1], hints), -pair[0]),
+            reverse=True,
+        )
+    ]
+
+
+def _cause_news_score(news: NewsItem, hints: tuple[str, ...]) -> int:
+    text = news.title + " " + news.description
+    return sum(1 for hint in hints if hint in text)
