@@ -24,6 +24,7 @@ NAVER_CLIENT_SECRET
 4. `Actions` 탭에서 `Daily Korea Stock Web Report` workflow를 한 번 수동 실행합니다.
 
 이후 평일 16:40 KST에 자동으로 리포트를 만들고 GitHub Pages에 배포합니다.
+workflow의 cron 값은 GitHub 예약 실행 안정성을 위해 UTC 기준 `40 7 * * 1-5`로 적어두었습니다.
 
 ## 로컬에서 웹 사이트 미리보기
 
