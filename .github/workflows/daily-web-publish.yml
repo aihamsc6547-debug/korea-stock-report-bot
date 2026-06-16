@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     # GitHub schedules are most reliable when written in UTC.
-    # 07:40 UTC = 16:40 KST.
+    # 07:40 UTC = 16:40 KST. Do not use 19:40 UTC; that is 04:40 KST next day.
     - cron: "40 7 * * 1-5"
 
 permissions:
@@ -13,6 +13,7 @@ permissions:
   id-token: write
 
 env:
+  TZ: Asia/Seoul
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 concurrency:
@@ -20,7 +21,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  kst_window:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.window.outputs.should_publish }}
+      kst_time: ${{ steps.window.outputs.kst_time }}
+    steps:
+      - name: Check KST publish window
+        id: window
+        run: |
+          kst_stamp="$(TZ=Asia/Seoul date +'%Y-%m-%d %H:%M:%S %Z')"
+          kst_hour="$(TZ=Asia/Seoul date +'%H')"
+          kst_minute="$(TZ=Asia/Seoul date +'%M')"
+          kst_minutes=$((10#$kst_hour * 60 + 10#$kst_minute))
+
+          echo "kst_time=$kst_stamp" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "Manual run: publishing outside the schedule window is allowed."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$kst_minutes" -ge 990 ] && [ "$kst_minutes" -le 1040 ]; then
+            echo "Scheduled run inside KST publish window: $kst_stamp"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Scheduled run skipped outside KST publish window: $kst_stamp"
+            echo "Expected around 16:40 KST."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
   publish:
+    needs: kst_window
+    if: needs.kst_window.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
