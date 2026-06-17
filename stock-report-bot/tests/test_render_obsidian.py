@@ -176,6 +176,64 @@ class SummarizeTest(unittest.TestCase):
 
         self.assertEqual(infer_cause(stock, news), "조선/기자재 테마")
 
+    def test_stock_theme_profile_wins_over_generic_ai_news_keyword(self) -> None:
+        stock = StockMove(
+            code="153460",
+            name="네이블",
+            market="KOSDAQ",
+            close=0,
+            change_percent=12.0,
+            volume=1,
+            trading_value=10_000_000_000,
+            reasons=("12% 이상 상승", "거래대금 50억 이상"),
+        )
+        news = [
+            NewsItem(
+                title="AI 인프라 투자 확대로 통신장비 수요 기대",
+                link="https://example.com",
+                originallink="",
+                description="5G와 6G 통신장비 관련 종목이 부각됐다.",
+            )
+        ]
+
+        self.assertEqual(infer_cause(stock, news), "IT / 통신")
+
+    def test_stock_theme_profile_fallback_when_news_is_unhelpful(self) -> None:
+        stock = StockMove(
+            code="153460",
+            name="네이블",
+            market="KOSDAQ",
+            close=0,
+            change_percent=12.0,
+            volume=1,
+            trading_value=10_000_000_000,
+            reasons=("12% 이상 상승", "거래대금 50억 이상"),
+        )
+
+        self.assertEqual(infer_cause(stock, []), "IT / 통신")
+
+    def test_stock_theme_profile_uses_current_keyword_inside_multi_theme_stock(self) -> None:
+        stock = StockMove(
+            code="049630",
+            name="재영솔루텍",
+            market="KOSDAQ",
+            close=0,
+            change_percent=12.0,
+            volume=1,
+            trading_value=10_000_000_000,
+            reasons=("12% 이상 상승", "거래대금 50억 이상"),
+        )
+        news = [
+            NewsItem(
+                title="재영솔루텍, 마켓컬리 지분 가치 부각",
+                link="https://example.com",
+                originallink="",
+                description="보유 지분과 유통 플랫폼 성장 기대가 투자심리를 자극했다.",
+            )
+        ]
+
+        self.assertEqual(infer_cause(stock, news), "유통 / 물류")
+
 
 if __name__ == "__main__":
     unittest.main()
