@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 from datetime import date, datetime, timedelta
 
+from .assign_news import assign_feature_news_to_stocks, merge_news_lists
 from .config import load_settings
 from .fetch_market import fetch_market_moves_with_status
 from .fetch_naver_market import fetch_latest_naver_market_moves
-from .fetch_news import fetch_stock_news
+from .fetch_news import fetch_feature_news, fetch_stock_news
 from .filter_stocks import dedupe_moves
 from .models import DailyReport, StockReportItem
 from .render_obsidian import write_report
@@ -23,9 +24,15 @@ def main() -> None:
         print(f"No market data for {requested_date.isoformat()}; using {report_date.isoformat()} instead.")
 
     items: list[StockReportItem] = []
+    feature_news = fetch_feature_news(report_date, settings)
+    assigned_feature_news = assign_feature_news_to_stocks(moves, feature_news)
 
     for move in moves:
-        news = fetch_stock_news(move, settings)
+        news = merge_news_lists(
+            assigned_feature_news.get(move.code, []),
+            fetch_stock_news(move, settings),
+            limit=settings.news_display,
+        )
         cause = infer_cause(move, news)
         news = prioritize_news_for_cause(news, cause)
         items.append(

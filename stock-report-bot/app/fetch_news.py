@@ -4,11 +4,12 @@ import html
 import json
 import re
 import time
-from datetime import datetime
+from datetime import date, datetime, time as datetime_time, timedelta
 from email.utils import parsedate_to_datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 from .config import Settings
 from .models import NewsItem, StockMove
@@ -17,6 +18,10 @@ from .models import NewsItem, StockMove
 NAVER_NEWS_ENDPOINT = "https://openapi.naver.com/v1/search/news.json"
 MIN_REQUEST_INTERVAL_SECONDS = 0.35
 MAX_RETRIES = 4
+FEATURE_NEWS_QUERIES = ("특징주", "상한가 특징주", "급등 특징주")
+FEATURE_NEWS_DISPLAY = 100
+FEATURE_NEWS_MAX_PAGES = 3
+KST = ZoneInfo("Asia/Seoul")
 _LAST_REQUEST_AT = 0.0
 
 
@@ -25,27 +30,56 @@ def fetch_stock_news(stock: StockMove, settings: Settings, display: int | None =
         return []
 
     for query in _build_news_queries(stock):
-        params = urlencode(
-            {
-                "query": query,
-                "display": display or settings.news_display,
-                "sort": "date",
-            }
-        )
-        request = Request(
-            f"{NAVER_NEWS_ENDPOINT}?{params}",
-            headers={
-                "X-Naver-Client-Id": settings.naver_client_id,
-                "X-Naver-Client-Secret": settings.naver_client_secret,
-            },
-        )
-
-        payload = _request_news_payload(request)
-        items = payload.get("items", [])
+        items = _fetch_news_query(query, settings, display=display or settings.news_display)
         if items:
-            return _rank_news_items(stock, [_parse_news_item(item) for item in items])
+            return _rank_news_items(stock, items)
 
     return []
+
+
+def fetch_feature_news(report_date: date, settings: Settings) -> list[NewsItem]:
+    if not settings.naver_client_id or not settings.naver_client_secret:
+        return []
+
+    collected: list[NewsItem] = []
+    for query in FEATURE_NEWS_QUERIES:
+        for page in range(FEATURE_NEWS_MAX_PAGES):
+            start = page * FEATURE_NEWS_DISPLAY + 1
+            items = _fetch_news_query(query, settings, display=FEATURE_NEWS_DISPLAY, start=start)
+            if not items:
+                break
+            collected.extend(filter_feature_news_items(items, report_date))
+
+    return _dedupe_news_items(collected)
+
+
+def filter_feature_news_items(items: list[NewsItem], report_date: date) -> list[NewsItem]:
+    return [
+        item
+        for item in items
+        if "특징주" in item.title and _is_after_market_open(item.pub_date, report_date)
+    ]
+
+
+def _fetch_news_query(query: str, settings: Settings, display: int, start: int = 1) -> list[NewsItem]:
+    params = urlencode(
+        {
+            "query": query,
+            "display": display,
+            "start": start,
+            "sort": "date",
+        }
+    )
+    request = Request(
+        f"{NAVER_NEWS_ENDPOINT}?{params}",
+        headers={
+            "X-Naver-Client-Id": settings.naver_client_id,
+            "X-Naver-Client-Secret": settings.naver_client_secret,
+        },
+    )
+
+    payload = _request_news_payload(request)
+    return [_parse_news_item(item) for item in payload.get("items", [])]
 
 
 def _build_news_queries(stock: StockMove) -> list[str]:
@@ -66,6 +100,28 @@ def _build_news_queries(stock: StockMove) -> list[str]:
         if query not in deduped:
             deduped.append(query)
     return deduped[:3]
+
+
+def _dedupe_news_items(items: list[NewsItem]) -> list[NewsItem]:
+    deduped: list[NewsItem] = []
+    seen: set[str] = set()
+    for item in items:
+        key = item.originallink or item.link or item.title
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
+def _is_after_market_open(pub_date: datetime | None, report_date: date) -> bool:
+    if not pub_date:
+        return False
+
+    local_pub_date = pub_date.astimezone(KST) if pub_date.tzinfo else pub_date.replace(tzinfo=KST)
+    market_open = datetime.combine(report_date, datetime_time(9, 0), tzinfo=KST)
+    next_day = datetime.combine(report_date + timedelta(days=1), datetime_time(0, 0), tzinfo=KST)
+    return market_open <= local_pub_date < next_day
 
 
 def _request_news_payload(request: Request) -> dict:
