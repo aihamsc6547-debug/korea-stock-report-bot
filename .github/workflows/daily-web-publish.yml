@@ -2,6 +2,11 @@ name: Daily Korea Stock Web Report
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/daily-web-publish.yml"
   schedule:
     # GitHub schedules are most reliable when written in UTC.
     # First attempt: 07:40 UTC = 16:40 KST.
@@ -41,7 +46,7 @@ jobs:
 
           echo "kst_time=$kst_stamp" >> "$GITHUB_OUTPUT"
 
-          if [ "${{ github.event_name }}" != "schedule" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Manual run: publishing outside the schedule window is allowed."
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -85,8 +90,8 @@ jobs:
 
           echo "report_path=$report_path" >> "$GITHUB_OUTPUT"
 
-          if [ "${{ github.event_name }}" = "schedule" ] && [ -f "$report_path" ]; then
-            echo "Scheduled run skipped because today's report already exists: $report_path"
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ -f "$report_path" ]; then
+            echo "Automated run skipped because today's report already exists: $report_path"
             echo "should_generate=false" >> "$GITHUB_OUTPUT"
           else
             echo "should_generate=true" >> "$GITHUB_OUTPUT"
