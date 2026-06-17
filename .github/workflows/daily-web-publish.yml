@@ -8,7 +8,8 @@ on:
     # Retry attempts cover GitHub scheduler delays/drops. Do not use 19:40 UTC; that is 04:40 KST next day.
     - cron: "40,45,50,55 7 * * 1-5"
     - cron: "0,5,10,15,20,25,30,35,40,45,50,55 8 * * 1-5"
-    - cron: "0,5,10,15,20,25,30 9 * * 1-5"
+    - cron: "0,5,10,15,20,25,30,35,40,45,50,55 9,10,11 * * 1-5"
+    - cron: "0 12 * * 1-5"
 
 permissions:
   contents: write
