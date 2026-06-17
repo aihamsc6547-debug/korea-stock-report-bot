@@ -4,8 +4,11 @@ on:
   workflow_dispatch:
   schedule:
     # GitHub schedules are most reliable when written in UTC.
-    # 07:40 UTC = 16:40 KST. Do not use 19:40 UTC; that is 04:40 KST next day.
-    - cron: "40 7 * * 1-5"
+    # First attempt: 07:40 UTC = 16:40 KST.
+    # Retry attempts cover GitHub scheduler delays/drops. Do not use 19:40 UTC; that is 04:40 KST next day.
+    - cron: "40,45,50,55 7 * * 1-5"
+    - cron: "0,5,10,15,20,25,30,35,40,45,50,55 8 * * 1-5"
+    - cron: "0,5,10,15,20,25,30 9 * * 1-5"
 
 permissions:
   contents: write
@@ -43,12 +46,12 @@ jobs:
             exit 0
           fi
 
-          if [ "$kst_minutes" -ge 990 ] && [ "$kst_minutes" -le 1040 ]; then
+          if [ "$kst_minutes" -ge 1000 ] && [ "$kst_minutes" -le 1260 ]; then
             echo "Scheduled run inside KST publish window: $kst_stamp"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
           else
             echo "Scheduled run skipped outside KST publish window: $kst_stamp"
-            echo "Expected around 16:40 KST."
+            echo "Expected between 16:40 and 21:00 KST."
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -69,8 +72,27 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Check today's report
+        id: daily_report
+        run: |
+          report_date="$(date +'%Y-%m-%d')"
+          report_year="$(date +'%Y')"
+          report_month="$(date +'%m')"
+          report_path="$REPORT_OUTPUT_DIR/$report_year/$report_month/$report_date-korea-market-report.md"
+
+          echo "report_path=$report_path" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "schedule" ] && [ -f "$report_path" ]; then
+            echo "Scheduled run skipped because today's report already exists: $report_path"
+            echo "should_generate=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_generate=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup Python
+        if: steps.daily_report.outputs.should_generate == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -78,10 +100,12 @@ jobs:
           cache-dependency-path: stock-report-bot/requirements.txt
 
       - name: Install dependencies
+        if: steps.daily_report.outputs.should_generate == 'true'
         working-directory: stock-report-bot
         run: pip install -r requirements.txt
 
       - name: Check required secrets
+        if: steps.daily_report.outputs.should_generate == 'true'
         run: |
           if [ -z "$NAVER_CLIENT_ID" ] || [ -z "$NAVER_CLIENT_SECRET" ]; then
             echo "Missing NAVER_CLIENT_ID or NAVER_CLIENT_SECRET repository secret."
@@ -89,20 +113,24 @@ jobs:
           fi
 
       - name: Run tests
+        if: steps.daily_report.outputs.should_generate == 'true'
         working-directory: stock-report-bot
         run: python -m unittest discover -s tests
 
       - name: Generate daily report
+        if: steps.daily_report.outputs.should_generate == 'true'
         working-directory: stock-report-bot
         run: |
           mkdir -p "$REPORT_OUTPUT_DIR" "$MPLCONFIGDIR"
           python -m app.main
 
       - name: Build static site
+        if: steps.daily_report.outputs.should_generate == 'true'
         working-directory: stock-report-bot
         run: python -m app.build_site --source-dir "$REPORT_OUTPUT_DIR" --output-dir "$GITHUB_WORKSPACE/public"
 
       - name: Commit generated report archive
+        if: steps.daily_report.outputs.should_generate == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -111,13 +139,16 @@ jobs:
           git push origin HEAD:"$GITHUB_REF_NAME"
 
       - name: Configure Pages
+        if: steps.daily_report.outputs.should_generate == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
+        if: steps.daily_report.outputs.should_generate == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
 
       - name: Deploy to GitHub Pages
+        if: steps.daily_report.outputs.should_generate == 'true'
         id: deployment
         uses: actions/deploy-pages@v4

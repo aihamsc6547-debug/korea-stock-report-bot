@@ -23,9 +23,10 @@ NAVER_CLIENT_SECRET
 3. 저장소 `Settings > Pages`에서 Source를 `GitHub Actions`로 설정합니다.
 4. `Actions` 탭에서 `Daily Korea Stock Web Report` workflow를 한 번 수동 실행합니다.
 
-이후 평일 16:40 KST에 자동으로 리포트를 만들고 GitHub Pages에 배포합니다.
-workflow의 cron 값은 GitHub 예약 실행 안정성을 위해 UTC 기준 `40 7 * * 1-5`로 적어두었습니다.
-혹시 GitHub가 오래된 예약 이벤트를 새벽 시간대에 호출하더라도, workflow 내부에서 한국 시간 16:30~17:20 범위 밖의 예약 실행은 발행하지 않도록 막아두었습니다.
+이후 평일 16:40 KST부터 자동으로 리포트를 만들고 GitHub Pages에 배포합니다.
+GitHub 예약 실행은 가끔 지연되거나 누락될 수 있어, workflow에는 16:40 KST 첫 시도 이후 5분 간격의 재시도 cron을 함께 넣어두었습니다.
+이미 당일 리포트가 생성되어 있으면 이후 재시도 실행은 바로 건너뜁니다.
+혹시 GitHub가 오래된 예약 이벤트를 새벽 시간대에 호출하더라도, workflow 내부에서 한국 시간 16:40~21:00 범위 밖의 예약 실행은 발행하지 않도록 막아두었습니다.
 
 ## 로컬에서 웹 사이트 미리보기
 
