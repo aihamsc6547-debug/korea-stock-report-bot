@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from .assign_news import assign_feature_news_to_stocks, merge_news_lists
 from .config import load_settings
@@ -12,6 +13,9 @@ from .filter_stocks import dedupe_moves
 from .models import DailyReport, StockReportItem
 from .render_obsidian import write_report
 from .summarize import infer_cause, prioritize_news_for_cause, summarize_news
+
+
+KST = ZoneInfo("Asia/Seoul")
 
 
 def main() -> None:
@@ -56,7 +60,7 @@ def parse_args() -> argparse.Namespace:
 
 def parse_date(value: str | None) -> date:
     if not value:
-        return date.today()
+        return datetime.now(KST).date()
 
     for fmt in ("%Y%m%d", "%Y-%m-%d"):
         try:

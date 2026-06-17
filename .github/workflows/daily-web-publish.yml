@@ -83,9 +83,9 @@ jobs:
       - name: Check today's report
         id: daily_report
         run: |
-          report_date="$(date +'%Y-%m-%d')"
-          report_year="$(date +'%Y')"
-          report_month="$(date +'%m')"
+          report_date="$(TZ=Asia/Seoul date +'%Y-%m-%d')"
+          report_year="$(TZ=Asia/Seoul date +'%Y')"
+          report_month="$(TZ=Asia/Seoul date +'%m')"
           report_path="$REPORT_OUTPUT_DIR/$report_year/$report_month/$report_date-korea-market-report.md"
 
           echo "report_path=$report_path" >> "$GITHUB_OUTPUT"
