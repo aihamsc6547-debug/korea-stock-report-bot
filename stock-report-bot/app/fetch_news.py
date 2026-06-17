@@ -31,8 +31,9 @@ def fetch_stock_news(stock: StockMove, settings: Settings, display: int | None =
 
     for query in _build_news_queries(stock):
         items = _fetch_news_query(query, settings, display=display or settings.news_display)
-        if items:
-            return _rank_news_items(stock, items)
+        ranked = _rank_news_items(stock, items)
+        if ranked:
+            return ranked
 
     return []
 
@@ -186,8 +187,7 @@ def _clean_html(value: str) -> str:
 def _rank_news_items(stock: StockMove, items: list[NewsItem]) -> list[NewsItem]:
     scored = [(item, _relevance_score(stock, item)) for item in items]
     positive = [pair for pair in scored if pair[1] > 0]
-    ranked = positive if positive else scored
-    return [item for item, _ in sorted(ranked, key=lambda pair: pair[1], reverse=True)]
+    return [item for item, _ in sorted(positive, key=lambda pair: pair[1], reverse=True)]
 
 
 def _relevance_score(stock: StockMove, item: NewsItem) -> int:
@@ -197,10 +197,16 @@ def _relevance_score(stock: StockMove, item: NewsItem) -> int:
 
     if stock.name in title:
         score += 100
-    if stock.name in description:
-        score += 40
-    if stock.code in title or stock.code in description:
+    if stock.code in title:
         score += 20
+
+    if not score:
+        return 0
+
+    if stock.name in description:
+        score += 20
+    if stock.code in description:
+        score += 10
     if any(keyword in title for keyword in ("특징주", "상한가", "급등", "거래량")):
         score += 10
 

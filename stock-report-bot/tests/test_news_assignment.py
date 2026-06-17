@@ -44,7 +44,7 @@ class FeatureNewsFilterTest(unittest.TestCase):
 
 
 class NewsAssignmentTest(unittest.TestCase):
-    def test_assigns_theme_article_by_stock_profile_keywords(self) -> None:
+    def test_assigns_only_direct_stock_feature_article(self) -> None:
         stocks = [
             StockMove(
                 code="006340",
@@ -69,17 +69,24 @@ class NewsAssignmentTest(unittest.TestCase):
         ]
         news = [
             NewsItem(
-                title="(특징주) 전선주, 해저케이블 기대에 강세",
-                link="https://example.com/cable",
+                title="(특징주) 대원전선, 해저케이블 기대에 강세",
+                link="https://example.com/direct",
                 originallink="",
                 description="전선과 구리 관련 종목에 매수세가 유입됐다.",
                 pub_date=datetime(2026, 6, 17, 10, 0, tzinfo=KST),
+            ),
+            NewsItem(
+                title="(특징주) 전선주, 해저케이블 기대에 강세",
+                link="https://example.com/theme",
+                originallink="",
+                description="전선 관련 종목에 매수세가 유입됐다.",
+                pub_date=datetime(2026, 6, 17, 10, 5, tzinfo=KST),
             )
         ]
 
         assigned = assign_feature_news_to_stocks(stocks, news)
 
-        self.assertEqual([item.link for item in assigned["006340"]], ["https://example.com/cable"])
+        self.assertEqual([item.link for item in assigned["006340"]], ["https://example.com/direct"])
         self.assertNotIn("153460", assigned)
 
     def test_merge_news_lists_dedupes_by_original_link(self) -> None:
@@ -100,7 +107,7 @@ class NewsAssignmentTest(unittest.TestCase):
 
         self.assertEqual(merged, [first])
 
-    def test_assigns_slash_separated_profile_keyword(self) -> None:
+    def test_does_not_assign_theme_article_by_profile_keyword(self) -> None:
         stock = StockMove(
             code="153460",
             name="네이블",
@@ -123,7 +130,7 @@ class NewsAssignmentTest(unittest.TestCase):
 
         assigned = assign_feature_news_to_stocks([stock], news)
 
-        self.assertEqual([item.link for item in assigned["153460"]], ["https://example.com/telecom"])
+        self.assertNotIn("153460", assigned)
 
 
 if __name__ == "__main__":
