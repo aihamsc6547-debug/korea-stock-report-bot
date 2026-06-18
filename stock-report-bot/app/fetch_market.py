@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date
 
 import pandas as pd
+from requests import RequestException
 
 from .config import Settings
 from .models import StockMove
@@ -34,8 +35,8 @@ def fetch_market_moves_with_status(target_date: date, settings: Settings) -> Mar
     for market in ("KOSPI", "KOSDAQ"):
         try:
             frame = stock.get_market_ohlcv_by_ticker(yyyymmdd, market=market)
-        except KeyError:
-            # pykrx may raise KeyError for holidays or dates with no KRX table.
+        except (KeyError, RequestException):
+            # Holidays can raise KeyError, while temporary KRX outages surface as request errors.
             continue
 
         if frame.empty:

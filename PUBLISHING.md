@@ -23,10 +23,19 @@ NAVER_CLIENT_SECRET
 3. 저장소 `Settings > Pages`에서 Source를 `GitHub Actions`로 설정합니다.
 4. `Actions` 탭에서 `Daily Korea Stock Web Report` workflow를 한 번 수동 실행합니다.
 
-이후 평일 16:40 KST부터 자동으로 리포트를 만들고 GitHub Pages에 배포합니다.
-GitHub 예약 실행은 가끔 지연되거나 누락될 수 있어, workflow에는 16:40 KST 첫 시도 이후 5분 간격의 재시도 cron을 함께 넣어두었습니다.
-이미 당일 리포트가 생성되어 있으면 이후 재시도 실행은 바로 건너뜁니다.
-혹시 GitHub가 오래된 예약 이벤트를 새벽 시간대에 호출하더라도, workflow 내부에서 한국 시간 16:40~21:00 범위 밖의 예약 실행은 발행하지 않도록 막아두었습니다.
+이후 평일 16:40 KST에 첫 자동 발행을 시도하고, 17:10~20:10 KST에는 한 시간 간격으로 누락 여부를 다시 확인합니다.
+예약식에는 `timezone: "Asia/Seoul"`을 명시합니다.
+GitHub 예약 실행은 지연되거나 누락될 수 있으므로, 늦게 도착한 실행도 버리지 않고 최근 거래일 리포트가 없을 때 발행합니다.
+이미 최근 거래일 리포트가 있으면 뉴스 수집과 발행을 건너뜁니다.
+
+정확한 시각 보장이 필요하면 외부 스케줄러에서 아래 GitHub API 이벤트를 호출할 수 있습니다.
+
+```text
+POST /repos/aihamsc6547-debug/korea-stock-report-bot/dispatches
+event_type: publish-daily-report
+```
+
+외부 호출에는 해당 저장소에 접근할 수 있는 GitHub fine-grained token이 필요합니다. 토큰은 저장소나 코드에 넣지 말고 외부 스케줄러의 비밀 값으로만 저장합니다.
 
 ## 로컬에서 웹 사이트 미리보기
 
@@ -53,4 +62,5 @@ python -m app.build_site --source-dir ../published-reports --output-dir ../publi
 
 - workflow는 `published-reports/`에 생성된 Markdown을 커밋하므로 날짜별 아카이브가 유지됩니다.
 - `public/`은 배포용 산출물이라 저장소에 커밋하지 않습니다.
-- 휴장일에는 프로그램이 최근 거래일 데이터를 찾아 사용합니다. 이미 같은 날짜 리포트가 있으면 커밋 변경 없이 Pages 배포만 다시 시도될 수 있습니다.
+- 휴장일이나 예약 지연 시에는 프로그램이 최근 거래일 데이터를 찾아 사용합니다.
+- 수동 `Run workflow`는 기존 리포트가 있어도 다시 생성하고, 예약 및 외부 호출은 기존 리포트를 유지합니다.

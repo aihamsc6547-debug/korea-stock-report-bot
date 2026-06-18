@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .assign_news import assign_feature_news_to_stocks, merge_news_lists
@@ -11,7 +12,7 @@ from .fetch_naver_market import fetch_latest_naver_market_moves
 from .fetch_news import fetch_feature_news, fetch_stock_news
 from .filter_stocks import dedupe_moves
 from .models import DailyReport, StockReportItem
-from .render_obsidian import write_report
+from .render_obsidian import report_file_path, write_report
 from .summarize import infer_cause, prioritize_news_for_cause, summarize_news
 
 
@@ -22,10 +23,23 @@ def main() -> None:
     args = parse_args()
     requested_date = parse_date(args.date)
     settings = load_settings()
+    generate_report(requested_date, settings, skip_existing=args.skip_existing)
+
+
+def generate_report(requested_date: date, settings, skip_existing: bool = False) -> Path:
+    requested_output_path = report_file_path(requested_date, settings.report_output_dir)
+    if skip_existing and requested_output_path.exists():
+        print(f"Report already exists; skipping generation: {requested_output_path}")
+        return requested_output_path
 
     report_date, moves = find_available_market_date(requested_date, settings)
     if report_date != requested_date:
         print(f"No market data for {requested_date.isoformat()}; using {report_date.isoformat()} instead.")
+
+    output_path = report_file_path(report_date, settings.report_output_dir)
+    if skip_existing and output_path.exists():
+        print(f"Report already exists; skipping generation: {output_path}")
+        return output_path
 
     items: list[StockReportItem] = []
     feature_news = fetch_feature_news(report_date, settings)
@@ -50,11 +64,17 @@ def main() -> None:
 
     output_path = write_report(DailyReport(report_date=report_date, items=tuple(items)), settings.report_output_dir)
     print(f"Created report: {output_path}")
+    return output_path
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create a Korean market close report for Obsidian.")
     parser.add_argument("--date", help="Report date in YYYYMMDD or YYYY-MM-DD format. Defaults to today.")
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip news collection when the latest available market-date report already exists.",
+    )
     return parser.parse_args()
 
 

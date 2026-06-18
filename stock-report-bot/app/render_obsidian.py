@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from .models import DailyReport, NewsItem, StockReportItem
@@ -50,11 +51,19 @@ def render_report(report: DailyReport) -> str:
 
 
 def write_report(report: DailyReport, output_dir: Path) -> Path:
-    month_dir = output_dir / f"{report.report_date:%Y}" / f"{report.report_date:%m}"
-    month_dir.mkdir(parents=True, exist_ok=True)
-    path = month_dir / f"{report.report_date.isoformat()}-korea-market-report.md"
+    path = report_file_path(report.report_date, output_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_report(report), encoding="utf-8")
     return path
+
+
+def report_file_path(report_date: date, output_dir: Path) -> Path:
+    return (
+        output_dir
+        / f"{report_date:%Y}"
+        / f"{report_date:%m}"
+        / f"{report_date.isoformat()}-korea-market-report.md"
+    )
 
 
 def _render_item(item: StockReportItem) -> list[str]:

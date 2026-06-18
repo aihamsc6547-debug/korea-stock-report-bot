@@ -2,19 +2,19 @@ name: Daily Korea Stock Web Report
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types:
+      - publish-daily-report
   push:
     branches:
       - main
     paths:
       - ".github/workflows/daily-web-publish.yml"
   schedule:
-    # GitHub schedules are most reliable when written in UTC.
-    # First attempt: 07:40 UTC = 16:40 KST.
-    # Retry attempts cover GitHub scheduler delays/drops. Do not use 19:40 UTC; that is 04:40 KST next day.
-    - cron: "40,45,50,55 7 * * 1-5"
-    - cron: "0,5,10,15,20,25,30,35,40,45,50,55 8 * * 1-5"
-    - cron: "0,5,10,15,20,25,30,35,40,45,50,55 9,10,11 * * 1-5"
-    - cron: "0 12 * * 1-5"
+    - cron: "40 16 * * 1-5"
+      timezone: "Asia/Seoul"
+    - cron: "10 17-20 * * 1-5"
+      timezone: "Asia/Seoul"
 
 permissions:
   contents: write
@@ -30,40 +30,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  kst_window:
-    runs-on: ubuntu-latest
-    outputs:
-      should_publish: ${{ steps.window.outputs.should_publish }}
-      kst_time: ${{ steps.window.outputs.kst_time }}
-    steps:
-      - name: Check KST publish window
-        id: window
-        run: |
-          kst_stamp="$(TZ=Asia/Seoul date +'%Y-%m-%d %H:%M:%S %Z')"
-          kst_hour="$(TZ=Asia/Seoul date +'%H')"
-          kst_minute="$(TZ=Asia/Seoul date +'%M')"
-          kst_minutes=$((10#$kst_hour * 60 + 10#$kst_minute))
-
-          echo "kst_time=$kst_stamp" >> "$GITHUB_OUTPUT"
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual run: publishing outside the schedule window is allowed."
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "$kst_minutes" -ge 1000 ] && [ "$kst_minutes" -le 1260 ]; then
-            echo "Scheduled run inside KST publish window: $kst_stamp"
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Scheduled run skipped outside KST publish window: $kst_stamp"
-            echo "Expected between 16:40 and 21:00 KST."
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-          fi
-
   publish:
-    needs: kst_window
-    if: needs.kst_window.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -80,25 +47,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref_name }}
 
-      - name: Check today's report
-        id: daily_report
-        run: |
-          report_date="$(TZ=Asia/Seoul date +'%Y-%m-%d')"
-          report_year="$(TZ=Asia/Seoul date +'%Y')"
-          report_month="$(TZ=Asia/Seoul date +'%m')"
-          report_path="$REPORT_OUTPUT_DIR/$report_year/$report_month/$report_date-korea-market-report.md"
-
-          echo "report_path=$report_path" >> "$GITHUB_OUTPUT"
-
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ -f "$report_path" ]; then
-            echo "Automated run skipped because today's report already exists: $report_path"
-            echo "should_generate=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_generate=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Setup Python
-        if: steps.daily_report.outputs.should_generate == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -106,12 +55,10 @@ jobs:
           cache-dependency-path: stock-report-bot/requirements.txt
 
       - name: Install dependencies
-        if: steps.daily_report.outputs.should_generate == 'true'
         working-directory: stock-report-bot
         run: pip install -r requirements.txt
 
       - name: Check required secrets
-        if: steps.daily_report.outputs.should_generate == 'true'
         run: |
           if [ -z "$NAVER_CLIENT_ID" ] || [ -z "$NAVER_CLIENT_SECRET" ]; then
             echo "Missing NAVER_CLIENT_ID or NAVER_CLIENT_SECRET repository secret."
@@ -119,24 +66,34 @@ jobs:
           fi
 
       - name: Run tests
-        if: steps.daily_report.outputs.should_generate == 'true'
         working-directory: stock-report-bot
         run: python -m unittest discover -s tests
 
       - name: Generate daily report
-        if: steps.daily_report.outputs.should_generate == 'true'
+        id: generate
         working-directory: stock-report-bot
         run: |
           mkdir -p "$REPORT_OUTPUT_DIR" "$MPLCONFIGDIR"
-          python -m app.main
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python -m app.main
+          else
+            python -m app.main --skip-existing
+          fi
+
+          if [ -n "$(git -C "$GITHUB_WORKSPACE" status --porcelain -- published-reports)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build static site
-        if: steps.daily_report.outputs.should_generate == 'true'
+        if: steps.generate.outputs.changed == 'true'
         working-directory: stock-report-bot
         run: python -m app.build_site --source-dir "$REPORT_OUTPUT_DIR" --output-dir "$GITHUB_WORKSPACE/public"
 
       - name: Commit generated report archive
-        if: steps.daily_report.outputs.should_generate == 'true'
+        if: steps.generate.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -145,16 +102,16 @@ jobs:
           git push origin HEAD:"$GITHUB_REF_NAME"
 
       - name: Configure Pages
-        if: steps.daily_report.outputs.should_generate == 'true'
+        if: steps.generate.outputs.changed == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
-        if: steps.daily_report.outputs.should_generate == 'true'
+        if: steps.generate.outputs.changed == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
 
       - name: Deploy to GitHub Pages
-        if: steps.daily_report.outputs.should_generate == 'true'
+        if: steps.generate.outputs.changed == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
