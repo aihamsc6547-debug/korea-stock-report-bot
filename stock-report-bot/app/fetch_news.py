@@ -25,13 +25,21 @@ KST = ZoneInfo("Asia/Seoul")
 _LAST_REQUEST_AT = 0.0
 
 
-def fetch_stock_news(stock: StockMove, settings: Settings, display: int | None = None) -> list[NewsItem]:
+def fetch_stock_news(
+    stock: StockMove,
+    report_date: date,
+    settings: Settings,
+    display: int | None = None,
+) -> list[NewsItem]:
     if not settings.naver_client_id or not settings.naver_client_secret:
         return []
 
     for query in _build_news_queries(stock):
         items = _fetch_news_query(query, settings, display=display or settings.news_display)
-        ranked = _rank_news_items(stock, items)
+        ranked = _rank_news_items(
+            stock,
+            [item for item in items if _is_report_date(item.pub_date, report_date)],
+        )
         if ranked:
             return ranked
 
@@ -123,6 +131,14 @@ def _is_after_market_open(pub_date: datetime | None, report_date: date) -> bool:
     market_open = datetime.combine(report_date, datetime_time(9, 0), tzinfo=KST)
     next_day = datetime.combine(report_date + timedelta(days=1), datetime_time(0, 0), tzinfo=KST)
     return market_open <= local_pub_date < next_day
+
+
+def _is_report_date(pub_date: datetime | None, report_date: date) -> bool:
+    if not pub_date:
+        return False
+
+    local_pub_date = pub_date.astimezone(KST) if pub_date.tzinfo else pub_date.replace(tzinfo=KST)
+    return local_pub_date.date() == report_date
 
 
 def _request_news_payload(request: Request) -> dict:

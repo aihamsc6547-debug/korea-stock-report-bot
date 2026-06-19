@@ -78,7 +78,9 @@ jobs:
         run: |
           mkdir -p "$REPORT_OUTPUT_DIR" "$MPLCONFIGDIR"
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Workflow update push: deploy the existing report archive without generating market data."
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
             python -m app.main
           else
             python -m app.main --skip-existing
@@ -102,7 +104,21 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add published-reports
           git diff --cached --quiet || git commit -m "Publish daily market report"
-          git push origin HEAD:"$GITHUB_REF_NAME"
+
+          for attempt in 1 2 3; do
+            git fetch origin "$GITHUB_REF_NAME"
+            git rebase "origin/$GITHUB_REF_NAME"
+
+            if git push origin HEAD:"$GITHUB_REF_NAME"; then
+              exit 0
+            fi
+
+            echo "Push attempt $attempt failed because main changed; retrying."
+            sleep $((attempt * 3))
+          done
+
+          echo "Unable to push the generated report after 3 attempts."
+          exit 1
 
       - name: Configure Pages
         if: steps.generate.outputs.changed == 'true' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.force)

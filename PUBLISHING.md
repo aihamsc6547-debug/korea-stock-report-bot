@@ -65,3 +65,4 @@ python -m app.build_site --source-dir ../published-reports --output-dir ../publi
 - `public/`은 배포용 산출물이라 저장소에 커밋하지 않습니다.
 - 휴장일이나 예약 지연 시에는 프로그램이 최근 거래일 데이터를 찾아 사용합니다.
 - 수동 `Run workflow`는 기존 리포트가 있어도 다시 생성하고, 예약 및 외부 호출은 기존 리포트를 유지합니다.
+- workflow 파일을 수정해 `main`에 push한 경우에는 장중 리포트를 생성하지 않고 기존 아카이브만 다시 배포합니다.

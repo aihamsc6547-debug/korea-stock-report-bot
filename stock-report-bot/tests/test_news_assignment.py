@@ -5,7 +5,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from app.assign_news import assign_feature_news_to_stocks, merge_news_lists
-from app.fetch_news import filter_feature_news_items
+from app.fetch_news import _is_report_date, filter_feature_news_items
 from app.models import NewsItem, StockMove
 
 
@@ -41,6 +41,13 @@ class FeatureNewsFilterTest(unittest.TestCase):
         filtered = filter_feature_news_items(items, date(2026, 6, 17))
 
         self.assertEqual([item.link for item in filtered], ["https://example.com/after"])
+
+    def test_stock_news_date_filter_rejects_old_articles(self) -> None:
+        report_date = date(2026, 6, 19)
+
+        self.assertTrue(_is_report_date(datetime(2026, 6, 19, 10, 0, tzinfo=KST), report_date))
+        self.assertFalse(_is_report_date(datetime(2025, 12, 22, 14, 0, tzinfo=KST), report_date))
+        self.assertFalse(_is_report_date(None, report_date))
 
 
 class NewsAssignmentTest(unittest.TestCase):

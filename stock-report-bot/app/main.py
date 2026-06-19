@@ -48,7 +48,7 @@ def generate_report(requested_date: date, settings, skip_existing: bool = False)
     for move in moves:
         news = merge_news_lists(
             assigned_feature_news.get(move.code, []),
-            fetch_stock_news(move, settings),
+            fetch_stock_news(move, report_date, settings),
             limit=settings.news_display,
         )
         cause = infer_cause(move, news)
