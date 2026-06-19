@@ -28,14 +28,15 @@ NAVER_CLIENT_SECRET
 GitHub 예약 실행은 지연되거나 누락될 수 있으므로, 늦게 도착한 실행도 버리지 않고 최근 거래일 리포트가 없을 때 발행합니다.
 이미 최근 거래일 리포트가 있으면 뉴스 수집과 발행을 건너뜁니다.
 
-정확한 시각 보장이 필요하면 외부 스케줄러에서 아래 GitHub API 이벤트를 호출할 수 있습니다.
+정확한 시각 보장이 필요하면 외부 스케줄러에서 아래 GitHub Actions API를 호출할 수 있습니다.
 
 ```text
-POST /repos/aihamsc6547-debug/korea-stock-report-bot/dispatches
-event_type: publish-daily-report
+POST /repos/aihamsc6547-debug/korea-stock-report-bot/actions/workflows/daily-web-publish.yml/dispatches
+{"ref":"main","inputs":{"force":false}}
 ```
 
-외부 호출에는 해당 저장소에 접근할 수 있는 GitHub fine-grained token이 필요합니다. 토큰은 저장소나 코드에 넣지 말고 외부 스케줄러의 비밀 값으로만 저장합니다.
+외부 호출에는 이 저장소의 `Actions: write` 권한만 가진 GitHub fine-grained token을 사용합니다.
+토큰은 저장소나 코드에 넣지 말고 외부 스케줄러의 비밀 헤더로만 저장합니다.
 
 ## 로컬에서 웹 사이트 미리보기
 

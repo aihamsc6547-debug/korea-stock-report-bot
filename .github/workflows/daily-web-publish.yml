@@ -2,9 +2,12 @@ name: Daily Korea Stock Web Report
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types:
-      - publish-daily-report
+    inputs:
+      force:
+        description: "Regenerate the latest market-date report even if it already exists"
+        required: false
+        default: true
+        type: boolean
   push:
     branches:
       - main
@@ -75,7 +78,7 @@ jobs:
         run: |
           mkdir -p "$REPORT_OUTPUT_DIR" "$MPLCONFIGDIR"
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
             python -m app.main
           else
             python -m app.main --skip-existing
@@ -88,7 +91,7 @@ jobs:
           fi
 
       - name: Build static site
-        if: steps.generate.outputs.changed == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: steps.generate.outputs.changed == 'true' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.force)
         working-directory: stock-report-bot
         run: python -m app.build_site --source-dir "$REPORT_OUTPUT_DIR" --output-dir "$GITHUB_WORKSPACE/public"
 
@@ -102,16 +105,16 @@ jobs:
           git push origin HEAD:"$GITHUB_REF_NAME"
 
       - name: Configure Pages
-        if: steps.generate.outputs.changed == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: steps.generate.outputs.changed == 'true' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.force)
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
-        if: steps.generate.outputs.changed == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: steps.generate.outputs.changed == 'true' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.force)
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
 
       - name: Deploy to GitHub Pages
-        if: steps.generate.outputs.changed == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: steps.generate.outputs.changed == 'true' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.force)
         id: deployment
         uses: actions/deploy-pages@v4
